@@ -1,0 +1,27 @@
+[project]
+name = "cli-voicebox"
+version = "0.1.0"
+description = "CLI for Voicebox TTS and voice profile API"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "httpx>=0.28.1",
+    "pydantic>=2.0.0",
+    "loguru>=0.7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/AICodeFactory/cli-voicebox"
+Repository = "https://github.com/AICodeFactory/cli-voicebox"
+Issues = "https://github.com/AICodeFactory/cli-voicebox/issues"
+
+[project.scripts]
+voicebox-cli = "cli_voicebox.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cli_voicebox"]
