@@ -75,7 +75,9 @@ voicebox-cli profiles
 
 ### `generate` — 文本转语音
 
-对应 [POST /generate](https://docs.voicebox.sh/developer/tts-generation)：
+Voicebox 的 [POST /generate](https://docs.voicebox.sh/developer/tts-generation) 是**异步**的：先返回 `status: "generating"`，后台合成完成后才可下载。CLI 会自动轮询 `/history/{id}`，完成后通过 `/audio/{id}` 保存文件。
+
+若服务端返回 HTTP 500 但任务已在后台跑起来，CLI 会尝试从 `/history` 恢复该任务并继续等待。
 
 ```bash
 # 先获取 profile_id
@@ -87,13 +89,25 @@ voicebox-cli generate \
   -o hello.wav
 ```
 
+仅提交、不等待（拿到 generation id 后自行查询）：
+
+```bash
+voicebox-cli generate -t "Hello" --profile-id "<uuid>" --no-wait
+```
+
+同步流式输出（`POST /generate/stream`，直接返回 WAV，不写历史）：
+
+```bash
+voicebox-cli generate -t "Hello" --profile-id "<uuid>" --stream -o hello.wav
+```
+
 从 JSON 文件传入完整请求体：
 
 ```bash
 voicebox-cli generate --body-file request.json -o out.wav
 ```
 
-可选参数：`--language`、`--engine`、`--seed`、`--model-size`、`--instruct`、`--max-chunk-chars`。
+可选参数：`--language`、`--engine`、`--seed`、`--model-size`、`--instruct`、`--max-chunk-chars`、`--poll-interval`。
 
 ### `audio` — 按 generation id 下载音频
 

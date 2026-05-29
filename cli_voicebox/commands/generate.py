@@ -71,14 +71,32 @@ def generate_command(args: argparse.Namespace) -> int:
     audio_path: str | None = None
     try:
         with VoiceboxClient(config) as client:
-            meta, raw_audio = client.generate(payload)
+            if args.stream:
+                if args.no_wait:
+                    raise ValueError("--stream cannot be used with --no-wait")
+                raw_audio = client.generate_stream(payload)
+                meta = {"mode": "stream", "profile_id": payload.get("profile_id")}
+            else:
+                meta = client.submit_generate(payload)
+
+                if not args.no_wait:
+                    gen_id = _resolve_generation_id(meta)
+                    if not gen_id:
+                        raise VoiceboxError("No generation id in response")
+                    status = str(meta.get("status") or "").lower()
+                    if status not in ("completed",):
+                        meta = client.wait_for_generation(
+                            gen_id,
+                            poll_interval=args.poll_interval,
+                        )
+                raw_audio = None
 
             if args.audio_out:
                 out = Path(args.audio_out)
                 if raw_audio:
                     _save_audio(out, raw_audio)
                     audio_path = str(out.resolve())
-                elif meta:
+                else:
                     gen_id = _resolve_generation_id(meta)
                     if not gen_id:
                         raise VoiceboxError(
@@ -87,8 +105,6 @@ def generate_command(args: argparse.Namespace) -> int:
                     audio_bytes = client.download_audio(gen_id)
                     _save_audio(out, audio_bytes)
                     audio_path = str(out.resolve())
-                else:
-                    raise VoiceboxError("Empty response from /generate")
     except VoiceboxError as exc:
         logger.error(str(exc))
         emit_result(api_result("failed", msg=str(exc)), args.format, args.output)
@@ -98,8 +114,7 @@ def generate_command(args: argparse.Namespace) -> int:
         emit_result(api_result("failed", msg=str(exc)), args.format, args.output)
         return 1
 
-    result = api_result("ok", data=meta, audio_file=audio_path)
-    emit_result(result, args.format, args.output)
+    emit_result(api_result("ok", data=meta, audio_file=audio_path), args.format, args.output)
     return 0
 
 
@@ -170,6 +185,23 @@ def add_parser(
         default=None,
         metavar="FILE",
         help="Full POST /generate JSON body (overrides -t and flags)",
+    )
+    parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="Submit only; return immediately with status=generating (poll with history/audio)",
+    )
+    parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=1.0,
+        metavar="SEC",
+        help="Poll interval while waiting for completion (default 1.0)",
+    )
+    parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="Use POST /generate/stream (blocking WAV, no history entry)",
     )
     parser.add_argument(
         "-o",

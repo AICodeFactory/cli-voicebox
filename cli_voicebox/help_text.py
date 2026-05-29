@@ -71,9 +71,10 @@ SUBCOMMAND_SUMMARY = {
 }
 
 GENERATE_DESCRIPTION = """\
-Generate speech via POST /generate.
+Generate speech via POST /generate (async) or POST /generate/stream (sync WAV).
 
-Requires profile_id (cloned or preset voice). List profiles with: voicebox-cli profiles
+Voicebox queues POST /generate and returns status=generating immediately.
+This CLI polls GET /history/{id} until completed, then downloads GET /audio/{id}.
 """
 
 GENERATE_EPILOG = """\
@@ -83,6 +84,9 @@ REQUEST
     --profile-id ID           Voice profile UUID (from profiles)
 
   Optional:
+    --no-wait                 Submit only; do not poll for completion
+    --poll-interval SEC       Poll interval while waiting (default 1.0)
+    --stream                  Blocking POST /generate/stream (direct WAV)
     --language CODE           e.g. en, zh (default from profile)
     --engine NAME             qwen|luxtts|kokoro|chatterbox|...
     --seed N                  Random seed
@@ -90,17 +94,19 @@ REQUEST
     --instruct TEXT           Delivery style (qwen_custom_voice)
     --max-chunk-chars N       Long-text chunk size (100-5000)
     --body-file FILE          Full JSON body (overrides individual flags)
-    -o, --audio-out FILE      Save WAV/audio to file (fetches /audio/{{id}} if needed)
+    -o, --audio-out FILE      Save WAV after generation completes
     --format json|text
     -c FILE                   Override config.json
 
 RESPONSE (stdout JSON)
   status: "ok" | "failed"
-  data: generation metadata from Voicebox
+  data: generation metadata (status=completed when waited)
   audio_file: path when -o/--audio-out is used
+  recovered: true if POST /generate errored but job was found in history
 
 EXAMPLES
-  voicebox-cli generate -t "Hello" --profile-id <uuid>
+  voicebox-cli generate -t "Hello" --profile-id <uuid> -o hello.wav
   voicebox-cli generate -t "你好" --profile-id <uuid> --language zh -o hello.wav
-  voicebox-cli generate --body-file request.json -o out.wav
+  voicebox-cli generate -t "Hi" --profile-id <uuid> --no-wait
+  voicebox-cli generate -t "Hi" --profile-id <uuid> --stream -o out.wav
 """
